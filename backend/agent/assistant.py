@@ -3,6 +3,7 @@ import json
 import re
 from pathlib import Path
 from config.database import get_db
+from langchain.prompts import PromptTemplate
 
 from agent.cache_manager import CacheManager
 from agent.llm_utils import ask_llm 
@@ -14,56 +15,23 @@ PROMPT_TEMPLATE = """
 [SYSTEM] Vous êtes un assistant SQL expert pour une base de données scolaire.
 Votre rôle est de traduire des questions en français en requêtes SQL MySQL.
 
-ATTENTION: 
-**l'année scolaire se trouve dans anneescolaire.AnneeScolaire non pas dans Annee 
-** si on dit l'annee XXXX/YYYY on parle de l'année scolaire XXXX/YYYY 
-**les table eleve et parent ne contienne pas les noms et les prenoms . ils se trouvent dans la table personne.
-**les table eleve et parent ne contienne pas les numéro de telephnone Tel1 et Tel2 . ils se trouvent dans la table personne.
-**les colonnes principale  du table personne sont : id, NomFr, PrenomFr, NomAr , PrenomAr, Cin,AdresseFr, AdresseAr, Tel1, Tel2,Nationalite,Localite,Civilite.
-**la trimestre 3 est d id 33, trimestre 2 est d id 32 , trimestre 1 est d id 31.
-**lorsque on veut avoir l id d un eleve  on fait cette jointure : 
-id_inscription IN (
-        SELECT id
-        FROM inscriptioneleve
-        WHERE Eleve IN (
-            SELECT id
-            FROM eleve
-            WHERE IdPersonne = "numéro de id "
-        )
-**lorsque on veut savoir l id de la séance on fait la jointure suivante : s.id=e.SeanceDebut  avec s pour la seance et e pour Emploidutemps 
-**lorsque on demande l etat de paiement on ne mais pas p.Annuler=0 avec p paiement ni CASE
-        WHEN p.Annuler = 1 THEN 'Annulé'
-        ELSE 'Actif'
-    END AS statut_paiement.
-**lorsque on veut savoir le paiement extra d un eleve on extrait le motif_paiement, le totalTTC  et le reste en faisant  la jointure entre le paiementextra et paiementextradetails d'une coté et paiementextra et paiementmotif d'une autre coté .
-**lorsque on demande les détails de paiement scolaire on extrait le mode de reglement ,numéro de chèque , montant et la date de l'opération. 
-**lorsque on demande l'mploi du temps d'un classe précie avec un jour précie on extrait le nom , le prénom de l'enseignant ,le nom de la matière , le nom de la salle , le debut et la fin de séance et le libelle de groupe (par classe...)
-**Les coordonées de debut et de la fin de séance se trouve dans le table emploidutemps sous forme d'id ,les covertir en heures a l'aide de table seance . 
-**la semaine A est d'id 2 , la semaine B est d'id 3 , Sans semaine d'id 1.
-**les colonnes principale  du table personne sont : id, NomFr, PrenomFr, NomAr , PrenomAr, Cin,AdresseFr, AdresseAr, Tel1, Tel2,Nationalite,Localite,Civilite.
-**pour les nom de jour en français on a une colone libelleJourFr avec mercredi c est ecrite Mercredi . 
-**utiliser des JOINs explicites . exemple au lieu de :WHERE
-    e.Classe = (SELECT id FROM classe WHERE CODECLASSEFR = '7B2')
-    AND e.Jour = (SELECT id FROM jour WHERE libelleJourFr = 'Mercredi')
-    ecrire:
- JOIN
-     jour j ON e.Jour = j.id AND j.libelleJourFr = 'Mercredi'
-JOIN
-     classe c ON e.Classe = c.id AND c.CODECLASSEFR = '7B2'
-**les résultats des trimestres se trouve dans le table Eduresultatcopie .
-**l id de l eleve est liée par l id de la personne par Idpersonne 
-**lorsqu'on demande les moyennes par matières pour une trimestre précise voici la requette qu on applique :
-SELECT em.libematifr AS matiere ,ed.moyemati AS moyenne, ex.codeperiexam AS codeTrimestre FROM
-           Eduperiexam ex, Edumoymaticopie ed, Edumatiere em, Eleve e
-           WHERE e.idedusrv=ed.idenelev and ed.codemati=em.codemati and
-           ex.codeperiexam=ed.codeperiexam  and  e.Idpersonne=(id_de la personne) and ed.moyemati not like '0.00' and ed.codeperiexam = ( id de la trimestre  ;
-**les eleves nouvellemmnent inscris ont un TypeInscri="N" et les eleves qui ont etudié auparavant a l'ecole ont TypeInscri="R".
-**un éleves n'est pas réinscri est éleves qui est inscrits pendant l'année précédante et pas pour cette année . 
-**la décision d'acceptation consernent seulement les nouveaux eleves inscrits a l'ecole.
-**pour les cheques a echeance non valides consulter la table reglementeleve_echeancier .
-**les cheques echancier non valide le champ isvalide=0.
+ATTENTION PARTICULIÈRE POUR LES QUESTIONS DE COMPTAGE:
+**Pour "nombre d'élèves" ou "combien d'élèves", utilisez: SELECT COUNT(*) AS nombre_eleves FROM eleve
+**Pour "nombre d'élèves inscrits cette année", utilisez: 
+   SELECT COUNT(*) AS nombre_eleves 
+   FROM eleve e 
+   JOIN inscriptioneleve ie ON e.id = ie.Eleve 
+   WHERE ie.Annuler = 0 AND ie.AnneeScolaire = (SELECT id FROM anneescolaire WHERE AnneeScolaire LIKE '%2024%')
 
-Voici la structure détaillée des tables pertinentes pour votre tâche (nom des tables, colonnes et leurs types) :
+RÈGLES GÉNÉRALES:
+**l'année scolaire se trouve dans anneescolaire.AnneeScolaire non pas dans Annee 
+**si on dit l'année XXXX/YYYY on parle de l'année scolaire XXXX/YYYY 
+**les table eleve et parent ne contiennent pas les noms et les prénoms. ils se trouvent dans la table personne.
+**les colonnes principales du table personne sont : id, NomFr, PrenomFr, NomAr, PrenomAr, Cin, AdresseFr, AdresseAr, Tel1, Tel2, Nationalite, Localite, Civilite.
+**utilisez des JOINs explicites plutôt que des sous-requêtes quand c'est possible.
+**pour les requêtes de comptage, utilisez toujours un alias descriptif comme "nombre_eleves", "total_classes", etc.
+
+Voici la structure détaillée des tables pertinentes pour votre tâche :
 {table_info}
 
 ---
@@ -71,26 +39,24 @@ Voici la structure détaillée des tables pertinentes pour votre tâche (nom des
 {relevant_domain_descriptions}
 
 ---
-**Informations Clés et Relations Fréquemment Utilisées pour une meilleure performance :**
+**Informations Clés et Relations :**
 {relations}
 
 ---
-**Instructions pour la génération SQL :**
-1.  Répondez UNIQUEMENT par une requête SQL MySQL valide et correcte.
-2.  Ne mettez AUCUN texte explicatif ou commentaire avant ou après la requête SQL. La réponse doit être purement la requête.
-3.  **Sécurité :** Générez des requêtes `SELECT` uniquement. Ne générez **JAMAIS** de requêtes `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE` ou toute autre commande de modification/suppression de données.
-4.  **Gestion de l'Année Scolaire :** Si l'utilisateur mentionne une année au format 'YYYY-YYYY' (ex: '2023-2024'), interprétez-la comme équivalente à 'YYYY/YYYY' et utilisez ce format pour la comparaison sur la colonne `Annee` de `anneescolaire` ou pour trouver l'ID correspondant.
-5.  **Robustesse aux Erreurs et Synonymes :** Le modèle doit être tolérant aux petites fautes de frappe et aux variations de langage. Il doit s'efforcer de comprendre l'intention de l'utilisateur même si les termes ne correspondent pas exactement aux noms de colonnes ou de tables. Par exemple, "eleves" ou "étudiants" devraient être mappés à la table `eleve`. "Moyenne" ou "résultat" devraient faire référence à `dossierscolaire.moyenne_general` ou `edumoymati`.
+**INSTRUCTIONS CRUCIALES :**
+1. Répondez UNIQUEMENT par une requête SQL MySQL valide et correcte.
+2. Ne mettez AUCUN texte explicatif ou commentaire avant ou après la requête SQL.
+3. Générez des requêtes SELECT uniquement.
+4. Pour les questions de comptage, utilisez COUNT(*) avec un alias descriptif en français.
+5. Si la question demande "combien" ou "nombre de", c'est forcément une requête COUNT.
 
-Question : {{user_question}}
+Question : {user_question}
 Requête SQL :
 """
-
-
 class SQLAssistant:
     def __init__(self):
-        self.db = get_db()  # Get the MySQL object from Flask-MySQLdb
-        self.connection = None  # Will be set when needed
+        self.db = get_db()
+        self.connection = None 
         self.relations_description = self.load_relations()
         self.domain_descriptions = self.load_domain_descriptions()
         self.domain_to_tables_mapping = self.load_domain_to_tables_mapping()
@@ -108,7 +74,65 @@ class SQLAssistant:
         except ValueError as e:
             print(f"❌ Erreur de chargement des templates: {str(e)}")
             self.templates_questions = []
+        self.clear_cache()
 
+    def get_table_info(self):
+        """Get information about database tables using Flask-MySQLdb"""
+        try:
+            # Créer une nouvelle connexion pour chaque opération
+            cur = self.db.connection.cursor()
+            
+            # Get tables
+            cur.execute("SHOW TABLES")
+            tables = cur.fetchall()
+            
+            table_info = {}
+            
+            for table in tables:
+                # Gérer les deux formats possibles de retour
+                table_name = table[0] if isinstance(table, tuple) else list(table.values())[0]
+                
+                # Get columns
+                cur.execute(f"DESCRIBE {table_name}")
+                columns = cur.fetchall()
+                
+                table_info[table_name] = {
+                    'columns': columns,
+                    'primary_key': [col['Field'] if isinstance(col, dict) else col[0] 
+                                for col in columns if (col.get('Key') == 'PRI' if isinstance(col, dict) else col[3] == 'PRI')]
+                }
+            
+            cur.close()
+            return json.dumps(table_info, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Error getting table info: {str(e)}")
+            raise
+
+    def run_query(self, sql_query):
+        """Execute a SQL query using Flask-MySQLdb"""
+        cur = None
+        try:
+            # Créer une nouvelle connexion pour chaque requête
+            cur = self.db.connection.cursor()
+            cur.execute(sql_query)
+            
+            if sql_query.strip().upper().startswith('SELECT'):
+                result = cur.fetchall()
+                columns = [desc[0] for desc in cur.description]
+                return {'columns': columns, 'rows': result}
+            else:
+                self.db.connection.commit()
+                return {'affected_rows': cur.rowcount}
+        except Exception as e:
+            if hasattr(self.db, 'connection'):
+                try:
+                    self.db.connection.rollback()
+                except:
+                    pass
+            raise e
+        finally:
+            if cur:
+                cur.close()
     def load_question_templates(self) -> list:
         base_path = Path(__file__).parent
         file_path = base_path / 'templates_questions.json'
@@ -123,65 +147,6 @@ class SQLAssistant:
         except Exception as e:
             print(f"❌ Erreur lors du chargement des templates: {e}")
             return []
-
-    def get_table_info(self):
-        """Get information about database tables using Flask-MySQLdb"""
-        try:
-            if not self.connection:
-                self.connection = self.db.connection
-            
-            cur = self.connection.cursor()
-            
-            # Get tables
-            cur.execute("SHOW TABLES")
-            tables = cur.fetchall()
-            
-            table_info = {}
-            db_name = self.db.connection.db
-            
-            for table in tables:
-                table_name = table[f'Tables_in_{db_name}']
-                
-                # Get columns
-                cur.execute(f"DESCRIBE {table_name}")
-                columns = cur.fetchall()
-                
-                table_info[table_name] = {
-                    'columns': columns,
-                    'primary_key': [col['Field'] for col in columns if col['Key'] == 'PRI']
-                }
-            
-            return json.dumps(table_info, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"Error getting table info: {str(e)}")
-            raise
-        finally:
-            if cur:
-                cur.close()
-
-    def run_query(self, sql_query):
-        """Execute a SQL query using Flask-MySQLdb"""
-        try:
-            if not self.connection:
-                self.connection = self.db.connection
-            
-            cur = self.connection.cursor()
-            cur.execute(sql_query)
-            
-            if sql_query.strip().upper().startswith('SELECT'):
-                result = cur.fetchall()
-                columns = [desc[0] for desc in cur.description]
-                return {'columns': columns, 'rows': result}
-            else:
-                self.connection.commit()
-                return {'affected_rows': cur.rowcount}
-        except Exception as e:
-            if self.connection:
-                self.connection.rollback()
-            raise
-        finally:
-            if cur:
-                cur.close()
 
     def find_matching_template(self, question: str) -> Optional[Dict[str, Any]]:
         exact_match = self._find_exact_template_match(question)
@@ -372,29 +337,81 @@ class SQLAssistant:
         except Exception as db_error:
             logger.error(f"❌ Erreur SQL (LLM): {db_error}")
             return sql_query, f"❌ Erreur d'exécution SQL : {str(db_error)}"
+    
     def format_result(self, result: dict, question: str = "") -> str:
         """Format the query results for display"""
         if not result or 'rows' not in result or not result['rows']:
             return "✅ Requête exécutée mais aucun résultat trouvé."
 
         try:
+            rows = result['rows']
+            columns = result['columns']
+            
+            # Cas spécial pour les requêtes COUNT
+            if len(columns) == 1 and len(rows) == 1:
+                col_name = columns[0].lower()
+                value = list(rows[0].values())[0] if isinstance(rows[0], dict) else rows[0][0]
+                
+                # Détection des questions de comptage
+                if self.is_count_question(question):
+                    if 'élève' in question.lower() or 'eleve' in question.lower():
+                        return f"Le nombre d'élèves est de **{value}** élèves."
+                    elif 'classe' in question.lower():
+                        return f"Le nombre de classes est de **{value}** classes."
+                    elif 'enseignant' in question.lower() or 'professeur' in question.lower():
+                        return f"Le nombre d'enseignants est de **{value}** enseignants."
+                    elif 'parent' in question.lower():
+                        return f"Le nombre de parents est de **{value}** parents."
+                    else:
+                        return f"Le résultat du comptage est de **{value}**."
+                
+                # Si c'est clairement une colonne COUNT
+                if 'count' in col_name or col_name.startswith('nombre'):
+                    return f"Le résultat est : **{value}**"
+            
+            # Format tableau pour les autres résultats
             formatted = []
             if question:
-                formatted.append(f"Résultats pour: {question}\n")
+                formatted.append(f"**Résultats pour :** {question}\n")
 
             # Format headers
-            headers = result['columns']
-            header_line = " | ".join(headers)
+            header_line = " | ".join(columns)
             formatted.append(header_line)
 
             # Format separator
-            separator = "-+-".join(['-' * len(h) for h in headers])
+            separator = "-+-".join(['-' * max(len(h), 4) for h in columns])
             formatted.append(separator)
 
-            # Format rows
-            for row in result['rows']:
-                formatted.append(" | ".join(str(value) for value in row.values()))
+            # Format rows (limiter à 10 premières lignes pour éviter les réponses trop longues)
+            row_count = 0
+            for row in rows:
+                if row_count >= 10:
+                    formatted.append(f"... et {len(rows) - 10} autres résultats")
+                    break
+                
+                if isinstance(row, dict):
+                    formatted.append(" | ".join(str(value) if value is not None else 'NULL' for value in row.values()))
+                else:
+                    formatted.append(" | ".join(str(value) if value is not None else 'NULL' for value in row))
+                row_count += 1
 
             return "\n".join(formatted)
+            
         except Exception as e:
-            return f"❌ Erreur de formatage: {str(e)}\nRésultat brut:\n{result}"
+            logger.error(f"Erreur formatage: {e}")
+            return f"❌ Erreur de formatage: {str(e)}"
+         
+    def clear_cache(self):
+        """Vider le cache pour éviter les mauvaises requêtes"""
+        if hasattr(self.cache, 'clear'):
+            self.cache.clear()
+        logger.info("🗑️ Cache vidé")
+    
+    def is_count_question(self, question: str) -> bool:
+        """Détecte si la question demande un comptage"""
+        count_keywords = [
+            'nombre', 'combien', 'count', 'total', 
+            'quantité', 'effectif', 'dénombr'
+        ]
+        question_lower = question.lower()
+        return any(keyword in question_lower for keyword in count_keywords)
