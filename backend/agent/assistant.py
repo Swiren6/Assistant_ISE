@@ -64,15 +64,15 @@ SELECT em.libematifr AS matiere ,ed.moyemati AS moyenne, ex.codeperiexam AS code
 **les cheques echancier non valide le champ isvalide=0.
 
 Voici la structure détaillée des tables pertinentes pour votre tâche (nom des tables, colonnes et leurs types) :
-{{table_info}}
+{table_info}
 
 ---
 **Description des domaines pertinents pour cette question :**
-{{relevant_domain_descriptions}}
+{relevant_domain_descriptions}
 
 ---
 **Informations Clés et Relations Fréquemment Utilisées pour une meilleure performance :**
-{{relations}}
+{relations}
 
 ---
 **Instructions pour la génération SQL :**
@@ -82,7 +82,7 @@ Voici la structure détaillée des tables pertinentes pour votre tâche (nom des
 4.  **Gestion de l'Année Scolaire :** Si l'utilisateur mentionne une année au format 'YYYY-YYYY' (ex: '2023-2024'), interprétez-la comme équivalente à 'YYYY/YYYY' et utilisez ce format pour la comparaison sur la colonne `Annee` de `anneescolaire` ou pour trouver l'ID correspondant.
 5.  **Robustesse aux Erreurs et Synonymes :** Le modèle doit être tolérant aux petites fautes de frappe et aux variations de langage. Il doit s'efforcer de comprendre l'intention de l'utilisateur même si les termes ne correspondent pas exactement aux noms de colonnes ou de tables. Par exemple, "eleves" ou "étudiants" devraient être mappés à la table `eleve`. "Moyenne" ou "résultat" devraient faire référence à `dossierscolaire.moyenne_general` ou `edumoymati`.
 
-Question : {{input}}
+Question : {{user_question}}
 Requête SQL :
 """
 
@@ -298,7 +298,6 @@ class SQLAssistant:
 
     def ask_question(self, question: str) -> tuple[str, str]:
         logger.info(f"📨 Question reçue: {question}")
-        print(f"🧾 Question utilisateur: {question}")
 
         # Vérifier le cache
         cached = self.cache.get_cached_query(question)
@@ -348,12 +347,13 @@ class SQLAssistant:
         print("🔍 Aucun template trouvé → Génération LLM")
 
         prompt = PROMPT_TEMPLATE.format(
-            input=question,
+            user_question=question,
             table_info=self.get_table_info(),
             relevant_domain_descriptions="\n".join(self.domain_descriptions.values()),
             relations=self.relations_description
         )
 
+        
         sql_query = self.ask_llm(prompt)
         if not sql_query:
             logger.warning("🚨 Requête vide générée par le LLM")
