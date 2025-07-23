@@ -305,22 +305,41 @@ class ApiService {
     }
   }
 
+  // Future<Map<String, dynamic>> askQuestion(String question, String token) async {
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse('$baseUrl/ask'),
+  //       headers: _getHeaders(token),
+  //       body: jsonEncode({'question': question}),
+  //     ).timeout(const Duration(seconds: 30));
+
+  //     return _handleResponse(response);
+  //   } on SocketException {
+  //     throw ApiException('Pas de connexion internet');
+  //   } catch (e) {
+  //     throw ApiException('Erreur lors de la requête: ${e.toString()}');
+  //   }
+  // }
+  // In your ApiService class
   Future<Map<String, dynamic>> askQuestion(String question, String token) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/ask'),
-        headers: _getHeaders(token),
-        body: jsonEncode({'question': question}),
-      ).timeout(const Duration(seconds: 30));
+  final response = await http.post(
+    Uri.parse('${AppConstants.apiBaseUrl}/ask'),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    },
+    body: jsonEncode({
+      'question': question,  // Format attendu par le backend
+    }),
+  );
 
-      return _handleResponse(response);
-    } on SocketException {
-      throw ApiException('Pas de connexion internet');
-    } catch (e) {
-      throw ApiException('Erreur lors de la requête: ${e.toString()}');
-    }
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  } else {
+    final error = jsonDecode(response.body)['error'] ?? 'Erreur inconnue';
+    throw ApiException(error, response.statusCode);
   }
-
+}
   Map<String, dynamic> _handleResponse(http.Response response) {
     final statusCode = response.statusCode;
     
