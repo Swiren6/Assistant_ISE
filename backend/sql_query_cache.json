@@ -1,0 +1,6 @@
+{
+  "94df1df882950eced16e9d7cd15ac041": {
+    "question_template": "donne moi le nombre des eleves",
+    "sql_template": "SELECT \n    p.NomFr AS Nom, \n    p.PrenomFr AS Prenom, \n    e.DateNaissance, \n    c.NOMCLASSEFR AS Classe,\n    pe.Type AS TypeParent,\n    pe.NomFr AS NomParent,\n    pe.PrenomFr AS PrenomParent,\n    pe.Tel1 AS TelephoneParent\nFROM \n    eleve e\nJOIN \n    personne p ON e.IdPersonne = p.id\nJOIN \n    inscriptioneleve ie ON e.id = ie.Eleve\nJOIN \n    classe c ON ie.Classe = c.id\nJOIN \n    parenteleve pe_rel ON e.id = pe_rel.Eleve\nJOIN \n    parent pa ON pe_rel.Parent = pa.id\nJOIN \n    personne pe ON pa.Personne = pe.id\nWHERE \n    ie.AnneeScolaire = (SELECT id FROM anneescolaire WHERE AnneeScolaire = '2023/2024')\n    AND ie.Annuler = 0\nORDER BY \n    c.NOMCLASSEFR, p.NomFr, p.PrenomFr;"
+  }
+}

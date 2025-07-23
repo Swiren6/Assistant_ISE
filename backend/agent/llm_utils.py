@@ -5,8 +5,8 @@ import os
 logger = logging.getLogger(__name__)  # Logger spécifique au fichier/module
 
 def ask_llm(prompt: str) -> str:
-    logger.info("🔁 Envoi du prompt au LLM...")
-    print(f"🧠 Prompt envoyé au LLM:\n{prompt}")
+    # logger.info("🔁 Envoi du prompt au LLM...")
+    # print(f"🧠 Prompt envoyé au LLM:\n{prompt}")
 
     try:
         client = Together(api_key=os.getenv("TOGETHER_API_KEY"))
