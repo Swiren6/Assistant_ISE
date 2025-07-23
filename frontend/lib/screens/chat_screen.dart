@@ -7,6 +7,7 @@ import '../models/message_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../utils/constants.dart';
+import 'dart:convert';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -38,6 +39,61 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+//   Future<void> _sendMessage() async {
+//   if (_messageController.text.trim().isEmpty || _isLoading) return;
+
+//   final userMessage = _messageController.text.trim();
+//   _messageController.clear();
+
+//   setState(() {
+//     _messages.add(Message.user(text: userMessage));
+//     _messages.add(Message.typing());
+//     _isLoading = true;
+//   });
+
+//   try {
+//     final authService = Provider.of<AuthService>(context, listen: false);
+//     final token = authService.token;
+    
+//     if (token == null) {
+//       throw ApiException('Authentification requise', 401);
+//     }
+
+//     final response = await _apiService.askQuestion(userMessage, token);
+    
+//     setState(() {
+//       _messages.removeLast();
+//       _messages.add(
+//         Message.assistant(
+//           text: response['response'] ?? 'Aucune réponse reçue',
+//           sqlQuery: response['sql_query'],
+//           tokensUsed: response['tokens_used'],
+//           cost: response['cost']?.toDouble(),
+//         ),
+//       );
+//       _isLoading = false;
+//     });
+//   } on ApiException catch (e) {
+//     setState(() {
+//       _messages.removeLast();
+//       _messages.add(Message.error(text: 'Erreur: ${e.message}'));
+//       _isLoading = false;
+//     });
+
+//     if (e.statusCode == 401) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('Veuillez vous reconnecter'))
+//       );
+//     }
+//   } catch (e) {
+//     setState(() {
+//       _messages.removeLast();
+//       _messages.add(Message.error(text: 'Erreur inattendue'));
+//       _isLoading = false;
+//     });
+//   }
+//   _scrollToBottom();
+// }
   Future<void> _sendMessage() async {
   if (_messageController.text.trim().isEmpty || _isLoading) return;
 
@@ -52,13 +108,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   try {
     final authService = Provider.of<AuthService>(context, listen: false);
-    final token = authService.token;
+    final token = authService.token ?? '';
     
-    if (token == null) {
-      throw ApiException('Authentification requise', 401);
-    }
-
+    // Debug: Afficher la requête avant envoi
+    print('Envoi de la requête avec body: ${jsonEncode({'question': userMessage})}');
+    
     final response = await _apiService.askQuestion(userMessage, token);
+    
+    // Debug: Afficher la réponse
+    print('Réponse reçue: $response');
     
     setState(() {
       _messages.removeLast();
@@ -66,34 +124,37 @@ class _ChatScreenState extends State<ChatScreen> {
         Message.assistant(
           text: response['response'] ?? 'Aucune réponse reçue',
           sqlQuery: response['sql_query'],
-          tokensUsed: response['tokens_used'],
-          cost: response['cost']?.toDouble(),
         ),
       );
       _isLoading = false;
     });
   } on ApiException catch (e) {
+    // Gestion améliorée des erreurs
+    String errorMsg = 'Erreur: ${e.message}';
+    if (e.statusCode == 422) {
+      errorMsg = 'Question mal formulée. Veuillez reformuler.';
+    }
+    
     setState(() {
       _messages.removeLast();
-      _messages.add(Message.error(text: 'Erreur: ${e.message}'));
+      _messages.add(Message.error(text: errorMsg));
       _isLoading = false;
     });
 
     if (e.statusCode == 401) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Veuillez vous reconnecter'))
+        SnackBar(content: Text('Session expirée. Veuillez vous reconnecter.'))
       );
     }
   } catch (e) {
     setState(() {
       _messages.removeLast();
-      _messages.add(Message.error(text: 'Erreur inattendue'));
+      _messages.add(Message.error(text: 'Erreur inattendue. Veuillez réessayer.'));
       _isLoading = false;
     });
   }
   _scrollToBottom();
 }
-  
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
