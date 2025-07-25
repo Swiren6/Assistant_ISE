@@ -4,16 +4,7 @@
             "template_question": "nombre d'élèves",
             "requete_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0",
             "description": "Compte le nombre total d'élèves inscrits"
-        },
-        {
-            "template_question": "combien d'élèves",
-            "requete_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0",
-            "description": "Compte le nombre total d'élèves inscrits"
-        },
-        {
-            "template_question": "nombre des élèves",
-            "requete_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0",
-            "description": "Compte le nombre total d'élèves inscrits"
         }
+        
     ]
 }

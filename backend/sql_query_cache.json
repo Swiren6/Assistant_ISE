@@ -10,5 +10,25 @@
   "fc54e0ace1b2fce78174740277de6bdc": {
     "question_template": "Combien d'élèves?",
     "sql_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0"
+  },
+  "9010dbea95c13a2b7e1de0575bde0543": {
+    "question_template": "Combien d'élèves sont inscrits cette année?",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0"
+  },
+  "0d7ed9f7eafbae400fb45b33f0a72649": {
+    "question_template": "le nombre des inscriptions pour cette annee",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0"
+  },
+  "939dcdd09fbb7079f494a9c878b6fbe3": {
+    "question_template": "le nombre des eleves dans la classe {CODECLASSEFR}",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0"
+  },
+  "270603fff1a5aeefe5b23cb0b88c6c18": {
+    "question_template": "donne moi le nombre des classes",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0"
+  },
+  "5ede642e1ccfccbc7b3edaecefb9681a": {
+    "question_template": "combien de classes",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0"
   }
 }

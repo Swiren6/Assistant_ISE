@@ -9,10 +9,10 @@ import 'utils/constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialisation du service de stockage
   await StorageService.init();
-  
+
   runApp(const MyApp());
 }
 
@@ -54,8 +54,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAuthStatus();
     });
-}
-
+  }
 
   void _checkAuthStatus() async {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -74,8 +73,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
 
-        return authService.isAuthenticated 
-            ? const ChatScreen() 
+        return authService.isAuthenticated
+            ? const ChatScreen()
             : const LoginScreen();
       },
     );
