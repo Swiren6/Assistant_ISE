@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import '../widgets/custom_appbar.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/sidebar_menu.dart';
@@ -39,122 +40,207 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-//   Future<void> _sendMessage() async {
-//   if (_messageController.text.trim().isEmpty || _isLoading) return;
-
-//   final userMessage = _messageController.text.trim();
-//   _messageController.clear();
-
-//   setState(() {
-//     _messages.add(Message.user(text: userMessage));
-//     _messages.add(Message.typing());
-//     _isLoading = true;
-//   });
-
-//   try {
-//     final authService = Provider.of<AuthService>(context, listen: false);
-//     final token = authService.token;
-    
-//     if (token == null) {
-//       throw ApiException('Authentification requise', 401);
-//     }
-
-//     final response = await _apiService.askQuestion(userMessage, token);
-    
-//     setState(() {
-//       _messages.removeLast();
-//       _messages.add(
-//         Message.assistant(
-//           text: response['response'] ?? 'Aucune réponse reçue',
-//           sqlQuery: response['sql_query'],
-//           tokensUsed: response['tokens_used'],
-//           cost: response['cost']?.toDouble(),
-//         ),
-//       );
-//       _isLoading = false;
-//     });
-//   } on ApiException catch (e) {
-//     setState(() {
-//       _messages.removeLast();
-//       _messages.add(Message.error(text: 'Erreur: ${e.message}'));
-//       _isLoading = false;
-//     });
-
-//     if (e.statusCode == 401) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('Veuillez vous reconnecter'))
-//       );
-//     }
-//   } catch (e) {
-//     setState(() {
-//       _messages.removeLast();
-//       _messages.add(Message.error(text: 'Erreur inattendue'));
-//       _isLoading = false;
-//     });
-//   }
-//   _scrollToBottom();
-// }
   Future<void> _sendMessage() async {
-  if (_messageController.text.trim().isEmpty || _isLoading) return;
+    if (_messageController.text.trim().isEmpty || _isLoading) return;
 
-  final userMessage = _messageController.text.trim();
-  _messageController.clear();
+    final userMessage = _messageController.text.trim();
+    _messageController.clear();
 
-  setState(() {
-    _messages.add(Message.user(text: userMessage));
-    _messages.add(Message.typing());
-    _isLoading = true;
-  });
-
-  try {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final token = authService.token ?? '';
-    
-    // Debug: Afficher la requête avant envoi
-    print('Envoi de la requête avec body: ${jsonEncode({'question': userMessage})}');
-    
-    final response = await _apiService.askQuestion(userMessage, token);
-    
-    // Debug: Afficher la réponse
-    print('Réponse reçue: $response');
-    
     setState(() {
-      _messages.removeLast();
-      _messages.add(
-        Message.assistant(
-          text: response['response'] ?? 'Aucune réponse reçue',
-          sqlQuery: response['sql_query'],
+      _messages.add(Message.user(text: userMessage));
+      _messages.add(Message.typing());
+      _isLoading = true;
+    });
+    _scrollToBottom();
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final token = authService.token ?? '';
+      
+      print('🔑 Token présent: ${token.isNotEmpty}');
+      print('💬 Envoi de la question: $userMessage');
+      
+      final response = await _apiService.askQuestion(userMessage, token);
+      
+      setState(() {
+        _messages.removeLast();
+        _messages.add(
+          Message.assistant(
+            text: response['response'] ?? 'Aucune réponse reçue',
+            sqlQuery: response['sql_query'],
+          ),
+        );
+        _isLoading = false;
+      });
+      
+      print('✅ Réponse reçue avec succès');
+      
+    } on ApiException catch (e) {
+      print('❌ ApiException: ${e.message} (Code: ${e.statusCode})');
+      
+      setState(() {
+        _messages.removeLast();
+        
+        String errorMessage;
+        switch (e.statusCode) {
+          case 422:
+            errorMessage = 'Question mal formulée. Veuillez reformuler votre question plus clairement.\n\nExemple: "Combien d\'élèves sont inscrits cette année?"';
+            break;
+          case 401:
+            errorMessage = 'Session expirée. Veuillez vous reconnecter.';
+            break;
+          case 503:
+            errorMessage = 'Service temporairement indisponible. Veuillez réessayer dans quelques instants.';
+            break;
+          case 500:
+            errorMessage = 'Erreur serveur. Si le problème persiste, contactez l\'administrateur.';
+            break;
+          default:
+            errorMessage = 'Erreur: ${e.message}';
+        }
+        
+        _messages.add(Message.error(text: errorMessage));
+        _isLoading = false;
+      });
+      
+      // Afficher une notification pour certaines erreurs
+      if (e.statusCode == 401) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Session expirée. Veuillez vous reconnecter.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      
+    } catch (e) {
+      print('❌ Erreur générale: $e');
+      
+      setState(() {
+        _messages.removeLast();
+        _messages.add(Message.error(
+          text: 'Erreur de connexion. Vérifiez votre réseau et réessayez.'
+        ));
+        _isLoading = false;
+      });
+      
+      // Afficher une notification d'erreur réseau
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur de connexion. Vérifiez votre réseau.'),
+          backgroundColor: Colors.red,
         ),
       );
-      _isLoading = false;
-    });
-  } on ApiException catch (e) {
-    // Gestion améliorée des erreurs
-    String errorMsg = 'Erreur: ${e.message}';
-    if (e.statusCode == 422) {
-      errorMsg = 'Question mal formulée. Veuillez reformuler.';
     }
     
-    setState(() {
-      _messages.removeLast();
-      _messages.add(Message.error(text: errorMsg));
-      _isLoading = false;
-    });
+    _scrollToBottom();
+  }
 
-    if (e.statusCode == 401) {
+  // Test direct de connexion HTTP
+  void _testDirectConnection() async {
+    print('🔍 === TEST DIRECT FLUTTER ===');
+    
+    try {
+      // Test avec http directement (sans passer par ApiService)
+      final uri = Uri.parse('http://localhost:5001/api/ask');
+      final headers = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json',
+      };
+      final body = jsonEncode({
+        'question': 'Combien d\'élèves sont inscrits cette année?'
+      });
+
+      print('📤 URI: $uri');
+      print('📤 Headers: $headers');
+      print('📤 Body: $body');
+
+      final response = await http.post(
+        uri,
+        headers: headers,
+        body: body,
+      );
+
+      print('📥 Status: ${response.statusCode}');
+      print('📥 Response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Test réussi: ${data['response']}'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Test échoué: ${response.statusCode}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+
+    } catch (e) {
+      print('❌ Erreur test direct: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Session expirée. Veuillez vous reconnecter.'))
+        SnackBar(
+          content: Text('❌ Erreur: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+        ),
       );
     }
-  } catch (e) {
-    setState(() {
-      _messages.removeLast();
-      _messages.add(Message.error(text: 'Erreur inattendue. Veuillez réessayer.'));
-      _isLoading = false;
-    });
   }
-  _scrollToBottom();
-}
+
+  // Diagnostic complet
+  void _debugConnection() async {
+    print('🔍 === DIAGNOSTIC DE CONNEXION ===');
+    
+    try {
+      // Test 1: Health check
+      print('🔍 Test 1: Health check...');
+      final health = await _apiService.healthCheck();
+      print('✅ Health: $health');
+      
+      // Test 2: Ask info
+      print('🔍 Test 2: Ask info...');
+      final askInfo = await _apiService.testAskEndpoint();
+      print('✅ Ask Info: $askInfo');
+      
+      // Test 3: Debug request
+      print('🔍 Test 3: Debug request...');
+      final debug = await _apiService.debugRequest('test question');
+      print('✅ Debug: $debug');
+      
+      // Test 4: Test de connexion générale
+      print('🔍 Test 4: Test de connexion...');
+      final connection = await _apiService.testConnection();
+      print('✅ Connexion: $connection');
+      
+      // Afficher un résumé à l'utilisateur
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Diagnostic terminé. Vérifiez la console pour les détails.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      
+    } catch (e) {
+      print('❌ Diagnostic échoué: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Diagnostic échoué: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+  
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -207,6 +293,16 @@ class _ChatScreenState extends State<ChatScreen> {
             tooltip: 'Nouvelle conversation',
           ),
           IconButton(
+            icon: const Icon(Icons.science),
+            onPressed: _testDirectConnection,
+            tooltip: 'Test direct',
+          ),
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: _debugConnection,
+            tooltip: 'Diagnostic',
+          ),
+          IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showInfoDialog(),
             tooltip: 'Informations',
@@ -214,46 +310,48 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       drawer: const SidebarMenu(),
-      body: Column(
-        children: [
-          if (_isLoading) 
-            const LinearProgressIndicator(
-              backgroundColor: Colors.transparent,
-              valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primaryColor),
-            ),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppConstants.primaryColor.withOpacity(0.05),
-                    Colors.transparent,
-                  ],
-                ),
+      body: SafeArea( // Ajout de SafeArea pour éviter l'overflow
+        child: Column(
+          children: [
+            if (_isLoading) 
+              const LinearProgressIndicator(
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primaryColor),
               ),
-              child: _messages.isEmpty 
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppConstants.paddingSmall, 
-                        vertical: AppConstants.paddingMedium,
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppConstants.primaryColor.withOpacity(0.05),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: _messages.isEmpty 
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppConstants.paddingSmall, 
+                          vertical: AppConstants.paddingMedium,
+                        ),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          final message = _messages[index];
+                          return MessageBubble(
+                            message: message,
+                            isMe: message.isMe,
+                          );
+                        },
                       ),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) {
-                        final message = _messages[index];
-                        return MessageBubble(
-                          message: message,
-                          isMe: message.isMe,
-                        );
-                      },
-                    ),
+              ),
             ),
-          ),
-          _buildMessageInput(),
-        ],
+            _buildMessageInput(),
+          ],
+        ),
       ),
     );
   }

@@ -195,12 +195,12 @@ def create_app():
 
     # 🌍 CORS config
     CORS(app, resources={
-        r"/api/*": {
-            "origins": "*",
-            "methods": ["GET", "POST", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    })
+    r"/api/*": {
+        "origins": ["*"],  # En production, spécifiez votre domaine
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
     # 🛠 Initialisation base de données
     init_db(app)
@@ -208,7 +208,6 @@ def create_app():
     # 🧩 Enregistrement des Blueprints
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(agent_bp, url_prefix='/api')
-
     # 🔎 Routes de test
     @app.route('/api/test')
     @jwt_required(optional=True)

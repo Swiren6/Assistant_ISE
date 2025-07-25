@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../utils/constants.dart';
+import '../screens/chat_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -413,39 +414,49 @@ class _FormContentState extends State<_FormContent>
     );
   }
 
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
+  // Remplacez votre méthode _submitForm() actuelle par celle-ci :
 
-    final authService = Provider.of<AuthService>(context, listen: false);
-    
-    try {
-      final success = await authService.login(
-        _loginController.text.trim(),
-        _passwordController.text.trim(),
+Future<void> _submitForm() async {
+  if (!_formKey.currentState!.validate()) return;
+
+  final authService = Provider.of<AuthService>(context, listen: false);
+  
+  try {
+    final success = await authService.login(
+      _loginController.text.trim(),
+      _passwordController.text.trim(),
+    );
+
+    if (success && mounted) {
+      // Afficher le message de succès
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('✅ Connexion réussie !'),
+          backgroundColor: AppConstants.successColor,
+          duration: const Duration(seconds: 2),
+        ),
       );
-
-      if (success && mounted) {
-        // Navigation automatique gérée par le main.dart via Consumer<AuthService>
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Connexion réussie !'),
-            backgroundColor: AppConstants.successColor,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: AppConstants.errorColor,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+      
+      // Navigation forcée vers ChatScreen
+      Navigator.of(context).pushReplacementNamed('/chat');
+      
+    } else {
+      // L'erreur sera affichée automatiquement via Consumer<AuthService>
+      print('❌ Connexion échouée');
+    }
+    
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: AppConstants.errorColor,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
+}
 
   void _showForgotPasswordDialog() {
     showDialog(
