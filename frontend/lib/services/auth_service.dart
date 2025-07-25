@@ -34,6 +34,7 @@ class AuthService with ChangeNotifier {
         _token = token;
         _user = UserModel.fromJson(userData);
         _isAuthenticated = true;
+        debugPrint('✅ Session restaurée depuis le storage');
       }
     } catch (e) {
       debugPrint('Erreur vérification statut auth: $e');
@@ -44,27 +45,62 @@ class AuthService with ChangeNotifier {
   }
 
   Future<bool> login(String loginIdentifier, String password) async {
+    debugPrint('🔐 AuthService.login() démarré');
     _setLoading(true);
     _clearError();
 
     try {
       final response = await _apiService.login(loginIdentifier, password);
+      debugPrint('📡 Réponse API reçue: ${response.keys.toList()}');
       
-      if (response['token'] != null) {
-        _token = response['token'];
-        _user = UserModel.fromJson(response);
-        _isAuthenticated = true;
+      // 🔥 CORRECTION: Vérifier que le token existe ET n'est pas vide
+      final receivedToken = response['token'];
+      debugPrint('🎯 Token reçu: ${receivedToken != null ? "Présent" : "NULL"}');
+      
+      if (receivedToken != null && receivedToken.toString().isNotEmpty) {
+        _token = receivedToken.toString();
+        debugPrint('✅ Token sauvegardé: ${_token!.substring(0, 20)}...');
         
+        // Créer l'utilisateur depuis la réponse
+        try {
+          _user = UserModel.fromJson(response);
+          debugPrint('✅ UserModel créé: ${_user?.idpersonne}');
+        } catch (e) {
+          debugPrint('⚠️ Erreur création UserModel: $e');
+          // Créer un utilisateur par défaut si échec
+          _user = UserModel(
+            idpersonne: response['idpersonne'] ?? 0,
+            roles: List<String>.from(response['roles'] ?? ['USER']),
+            changepassword: response['changepassword'] ?? 0,
+          );
+          debugPrint('✅ UserModel par défaut créé');
+        }
+        
+        _isAuthenticated = true;
+        debugPrint('✅ isAuthenticated défini à true');
+
+        // Sauvegarder dans le storage
         await _storageService.saveToken(_token!);
         await _storageService.saveUserData(response);
+        debugPrint('✅ Données sauvegardées dans le storage');
+        
+        debugPrint('🎉 Connexion RÉUSSIE');
         return true;
+        
+      } else {
+        debugPrint('❌ Token NULL ou vide dans la réponse');
+        _setError('Aucun token reçu du serveur');
+        return false;
       }
+      
     } catch (e) {
+      debugPrint('❌ Erreur login: $e');
       _setError(e.toString());
+      return false;
     } finally {
       _setLoading(false);
+      debugPrint('🔚 AuthService.login() terminé');
     }
-    return false;
   }
 
   Future<void> logout() async {
@@ -74,7 +110,8 @@ class AuthService with ChangeNotifier {
       _user = null;
       _token = null;
       _isAuthenticated = false;
-      notifyListeners();
+      _clearError();
+      debugPrint('✅ Déconnexion réussie');
     } catch (e) {
       debugPrint('Erreur lors de la déconnexion: $e');
     } finally {
@@ -95,15 +132,28 @@ class AuthService with ChangeNotifier {
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
+    debugPrint('⏳ Loading: $loading');
   }
 
   void _setError(String error) {
     _errorMessage = error;
     notifyListeners();
+    debugPrint('❌ Erreur: $error');
   }
 
   void _clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  // Debug de l'état
+  void debugState() {
+    debugPrint('=== AUTH SERVICE STATE ===');
+    debugPrint('Token: ${_token != null ? "Présent" : "NULL"}');
+    debugPrint('User: ${_user?.idpersonne ?? "NULL"}');
+    debugPrint('IsAuthenticated: $_isAuthenticated');
+    debugPrint('IsLoading: $_isLoading');
+    debugPrint('Error: $_errorMessage');
+    debugPrint('========================');
   }
 }

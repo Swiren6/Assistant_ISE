@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 class AppConstants {
   // Configuration API
-  // static const String apiBaseUrl = 'http://localhost:5001/api';
+  static const String apiBaseUrl = 'http://localhost:5001/api';
   // Alternative pour les tests réseau
-  static const String apiBaseUrl = 'http://192.168.56.1:5001/api';
+  // static const String apiBaseUrl = 'http://192.168.56.1:5001/api';
 
   // Couleurs principales
   static const Color primaryColor = Color(0xFF2196F3);
@@ -78,9 +78,9 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // Permissions et rôles
-  static const List<String> adminRoles = ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'];
-  static const List<String> teacherRoles = ['ROLE_TEACHER', 'ROLE_ADMIN'];
-  static const List<String> studentRoles = ['ROLE_STUDENT'];
+  // static const List<String> adminRoles = ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'];
+  // static const List<String> teacherRoles = ['ROLE_TEACHER', 'ROLE_ADMIN'];
+  // static const List<String> studentRoles = ['ROLE_STUDENT'];
 
   // Regex patterns
   static const String emailPattern =

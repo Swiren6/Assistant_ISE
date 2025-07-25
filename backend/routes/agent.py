@@ -1,129 +1,137 @@
-# from flask import Blueprint, request, jsonify
-# from agent.assistant import SQLAssistant
-# from flask_jwt_extended import jwt_required  # facultatif si tu veux protéger l'accès
-# import logging
-
-# assistant = SQLAssistant()
-# agent_bp = Blueprint('agent_bp', __name__)
-# logger = logging.getLogger(__name__)
-
-# @agent_bp.route('/ask', methods=['POST'])
-# @jwt_required(optional=True)
-# def ask_sql():
-#     # Vérification du Content-Type
-#     if not request.is_json:
-#         return jsonify({"error": "Content-Type must be application/json"}), 415
-    
-#     try:
-#         data = request.get_json()
-#         if not data:
-#             return jsonify({"error": "No JSON data received"}), 400
-            
-#         # Validation du champ 'question'
-#         if 'question' not in data or not isinstance(data['question'], str):
-#             return jsonify({"error": "Question must be a non-empty string"}), 422
-            
-#         question = data['question'].strip()
-#         if not question:
-#             return jsonify({"error": "Question cannot be empty"}), 422
-
-#         # Logging pour débogage
-#         current_app.logger.info(f"Question reçue : {question}")
-        
-#         try:
-#             sql_query, response = assistant.ask_question(question)
-#             return jsonify({
-#                 "sql_query": sql_query,
-#                 "response": response
-#             })
-#         except Exception as e:
-#             current_app.logger.error(f"Erreur de traitement : {str(e)}")
-#             return jsonify({"error": "Failed to process question"}), 500
-            
-#     except Exception as e:
-#         current_app.logger.error(f"Erreur JSON : {str(e)}")
-#         return jsonify({"error": "Invalid request format"}), 400
-
-# @agent_bp.route('/ask', methods=['GET'])
-# def ask_info():
-#     return jsonify({"message": "Agent IA prêt à recevoir les questions 📚🧠"}), 200
-
-
-from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 import logging
-
-# Import de l'assistant - à compléter selon votre structure
-from agent.assistant import SQLAssistant
+import traceback
 
 agent_bp = Blueprint('agent_bp', __name__)
 logger = logging.getLogger(__name__)
 
-assistant = SQLAssistant()  #
-
+# Initialisation assistant
+assistant = None
+try:
+    from agent.assistant import SQLAssistant
+    assistant = SQLAssistant()
+    print("✅ Assistant chargé avec succès")
+except Exception as e:
+    print(f"❌ Erreur assistant: {e}")
+    assistant = None
 
 @agent_bp.route('/ask', methods=['POST'])
-@jwt_required(optional=True)
-def ask_sql():
-    """Endpoint pour traiter les questions du chat"""
-    current_app.logger.info("=== Nouvelle requête /ask ===")
+def ask_sql():  # 🔧 Supprimé @jwt_required temporairement
+    print("🔥🔥🔥 VERSION SANS JWT_REQUIRED 🔥🔥🔥")
+    print("=== NOUVELLE REQUÊTE /ask ===")
     
-    # Vérification du Content-Type
-    if not request.is_json:
-        return jsonify({"error": "Content-Type must be application/json"}), 415
+    # 🔧 Gestion JWT manuelle et optionnelle
+    jwt_valid = False
+    current_user = None
     
     try:
+        # Essayer de vérifier le JWT si présent
+        if 'Authorization' in request.headers:
+            print("🔑 Token JWT détecté, vérification...")
+            verify_jwt_in_request(optional=True)
+            current_user = get_jwt_identity()
+            jwt_valid = True
+            print(f"✅ JWT valide pour utilisateur: {current_user}")
+        else:
+            print("ℹ️ Pas de token JWT, accès anonyme")
+    except Exception as jwt_error:
+        print(f"⚠️ Erreur JWT (ignorée): {jwt_error}")
+        # On continue sans JWT
+    
+    try:
+        # Validation JSON
+        if not request.is_json:
+            print("❌ Pas de JSON")
+            return jsonify({"error": "JSON requis"}), 415
+        
+        # Récupération données
         data = request.get_json()
-        current_app.logger.info(f"Données reçues: {data}")
+        print(f"🔍 Données reçues: {data}")
+        print(f"🔍 Utilisateur: {current_user if jwt_valid else 'Anonyme'}")
         
         if not data:
-            return jsonify({"error": "No JSON data received"}), 400
-            
-        # Validation améliorée
-        question = data.get('question')
-        if question is None:
-            return jsonify({"error": "Missing 'question' field"}), 422
-            
-        if not isinstance(question, str):
-            return jsonify({"error": "Question must be a string"}), 422
-            
-        question = question.strip()
+            print("❌ Données vides")
+            return jsonify({"error": "Pas de données"}), 400
+        
+        # Recherche de la question
+        question = None
+        field_found = None
+        
+        possible_fields = ['question', 'subject', 'query', 'text', 'message', 'prompt']
+        for field in possible_fields:
+            if field in data:
+                value = data[field]
+                print(f"🔍 Champ '{field}' trouvé: {value} (type: {type(value)})")
+                if value and str(value).strip():
+                    question = str(value).strip()
+                    field_found = field
+                    break
+        
+        print(f"🎯 Question finale: '{question}' (depuis champ: {field_found})")
+        
         if not question:
-            return jsonify({"error": "Question cannot be empty"}), 422
-
-        # Traitement normal...
+            print("❌ Aucune question trouvée")
+            return jsonify({
+                "error": "Question manquante",
+                "received_fields": list(data.keys()),
+                "msg": "Aucune question valide trouvée"
+            }), 422
+        
+        # Vérification assistant
+        if not assistant:
+            print("❌ Assistant indisponible")
+            return jsonify({"error": "Assistant indisponible"}), 503
+        
+        print(f"🚀 Traitement: '{question}'")
+        
+        # Traitement
         try:
             sql_query, response = assistant.ask_question(question)
+            print(f"✅ Succès: SQL={sql_query}")
+            
+            result = {
+                "sql_query": sql_query,
+                "response": response,
+                "status": "success"
+            }
+            
+            # Ajouter info utilisateur si JWT valide
+            if jwt_valid:
+                result["user"] = current_user
+            
+            return jsonify(result), 200
+            
         except Exception as e:
-            current_app.logger.error(f"Erreur assistant: {str(e)}")
-            return jsonify({"error": "Erreur dans la génération de la réponse"}), 500
-        response = f"Réponse à: {question}"
-        
-        return jsonify({
-            "sql_query": sql_query,
-            "response": response
-        }), 200
+            print(f"❌ Erreur traitement: {e}")
+            print(f"❌ Traceback: {traceback.format_exc()}")
+            return jsonify({
+                "error": "Erreur traitement",
+                "msg": str(e)
+            }), 500
         
     except Exception as e:
-        current_app.logger.error(f"Erreur: {str(e)}")
-        return jsonify({"error": "Server error"}), 500@agent_bp.route('/ask', methods=['GET'])
+        print(f"❌ Erreur générale: {e}")
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        return jsonify({
+            "error": "Erreur serveur",
+            "msg": str(e)
+        }), 500
+        
+@agent_bp.route('/ask', methods=['GET'])
 def ask_info():
-    """Information sur l'endpoint ask"""
+    """Information sur l'endpoint"""
     return jsonify({
-        "message": "Agent IA prêt à recevoir les questions 📚🧠",
-        "endpoint": "/api/ask",
+        "message": "Assistant IA pour questions scolaires",
         "method": "POST",
-        "required_fields": ["question"],
-        "example": {
-            "question": "Combien d'élèves sont inscrits cette année?"
-        }
-    }), 200
+        "format": {"question": "Votre question ici"},
+        "status": "OK" if assistant else "ERROR"
+    })
 
-@agent_bp.route('/test', methods=['GET'])
-def test_agent():
-    """Test simple de l'agent"""
+@agent_bp.route('/health', methods=['GET'])
+def health():
+    """Vérification de santé"""
     return jsonify({
-        "status": "Agent endpoint working",
-        "timestamp": "2024-01-01 12:00:00"
-    }), 200 
-    
+        "status": "OK",
+        "assistant": "OK" if assistant else "ERROR"
+    })

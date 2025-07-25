@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../utils/constants.dart';
+import '../screens/chat_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -86,9 +87,9 @@ class _Logo extends StatelessWidget {
             ),
           ),
         ),
-        
+
         const SizedBox(height: AppConstants.paddingLarge),
-        
+
         // Titre de l'application
         Text(
           AppConstants.appName,
@@ -99,9 +100,9 @@ class _Logo extends StatelessWidget {
             color: AppConstants.primaryColor,
           ),
         ),
-        
+
         const SizedBox(height: AppConstants.paddingSmall),
-        
+
         // Sous-titre
         Text(
           'Votre assistant intelligent',
@@ -123,12 +124,12 @@ class _FormContent extends StatefulWidget {
   State<_FormContent> createState() => _FormContentState();
 }
 
-class _FormContentState extends State<_FormContent> 
+class _FormContentState extends State<_FormContent>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _loginController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
   late AnimationController _animationController;
@@ -191,9 +192,9 @@ class _FormContentState extends State<_FormContent>
                   color: AppConstants.primaryColor,
                 ),
               ),
-              
+
               const SizedBox(height: AppConstants.paddingLarge),
-              
+
               // Champ identifiant
               _buildTextField(
                 controller: _loginController,
@@ -208,9 +209,9 @@ class _FormContentState extends State<_FormContent>
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: AppConstants.paddingMedium),
-              
+
               // Champ mot de passe
               _buildTextField(
                 controller: _passwordController,
@@ -225,8 +226,8 @@ class _FormContentState extends State<_FormContent>
                         : Icons.visibility_off_outlined,
                     color: AppConstants.textHint,
                   ),
-                  onPressed: () => setState(() => 
-                      _isPasswordVisible = !_isPasswordVisible),
+                  onPressed: () =>
+                      setState(() => _isPasswordVisible = !_isPasswordVisible),
                 ),
                 validator: (value) {
                   if (value?.isEmpty ?? true) {
@@ -238,15 +239,16 @@ class _FormContentState extends State<_FormContent>
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: AppConstants.paddingMedium),
-              
+
               // Case "Se souvenir de moi"
               Row(
                 children: [
                   Checkbox(
                     value: _rememberMe,
-                    onChanged: (value) => setState(() => _rememberMe = value ?? false),
+                    onChanged: (value) =>
+                        setState(() => _rememberMe = value ?? false),
                     activeColor: AppConstants.primaryColor,
                   ),
                   Text(
@@ -258,9 +260,9 @@ class _FormContentState extends State<_FormContent>
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: AppConstants.paddingLarge),
-              
+
               // Bouton de connexion
               Consumer<AuthService>(
                 builder: (context, authService, child) {
@@ -273,7 +275,8 @@ class _FormContentState extends State<_FormContent>
                           vertical: AppConstants.paddingLarge,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                          borderRadius:
+                              BorderRadius.circular(AppConstants.radiusMedium),
                         ),
                         elevation: 2,
                       ),
@@ -298,9 +301,9 @@ class _FormContentState extends State<_FormContent>
                   );
                 },
               ),
-              
+
               const SizedBox(height: AppConstants.paddingMedium),
-              
+
               // Message d'erreur
               Consumer<AuthService>(
                 builder: (context, authService, child) {
@@ -309,7 +312,8 @@ class _FormContentState extends State<_FormContent>
                       padding: const EdgeInsets.all(AppConstants.paddingMedium),
                       decoration: BoxDecoration(
                         color: AppConstants.errorColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusMedium),
                         border: Border.all(
                           color: AppConstants.errorColor.withOpacity(0.3),
                         ),
@@ -338,9 +342,9 @@ class _FormContentState extends State<_FormContent>
                   return const SizedBox.shrink();
                 },
               ),
-              
+
               const SizedBox(height: AppConstants.paddingMedium),
-              
+
               // Liens supplémentaires
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -417,7 +421,7 @@ class _FormContentState extends State<_FormContent>
     if (!_formKey.currentState!.validate()) return;
 
     final authService = Provider.of<AuthService>(context, listen: false);
-    
+
     try {
       final success = await authService.login(
         _loginController.text.trim(),
@@ -425,14 +429,21 @@ class _FormContentState extends State<_FormContent>
       );
 
       if (success && mounted) {
-        // Navigation automatique gérée par le main.dart via Consumer<AuthService>
+        // Afficher le message de succès
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Connexion réussie !'),
+            content: const Text('✅ Connexion réussie !'),
             backgroundColor: AppConstants.successColor,
             duration: const Duration(seconds: 2),
           ),
         );
+        print('✅ Navigation réussie');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const ChatScreen()),
+        );
+      } else {
+        // L'erreur sera affichée automatiquement via Consumer<AuthService>
+        print('❌ Connexion échouée');
       }
     } catch (e) {
       if (mounted) {

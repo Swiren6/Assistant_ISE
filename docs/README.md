@@ -11,11 +11,12 @@ assistant_scolaire/
 │   │   └── message.py            # Modèle message
 │   ├── routes/
 │   │   ├── auth.py               # Routes d'authentification
-│   │   └── chat.py               # Routes de chat
+│   │   └── agent.py               # Routes de chat
 │   ├── services/
 │   │   ├── auth_service.py       # Service d'authentification
 │   │   └── sql_assistant.py     # Agent SQL avec LLM (ancien agent.py)
 |   ├──agent/
+│   │   ├──assistant.py
 │   │   ├── prompts/
 |   |   |   ├── domain_description.json
 |   |   |   ├── domain_tables_mapping.json
