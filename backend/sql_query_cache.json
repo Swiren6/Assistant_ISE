@@ -30,5 +30,13 @@
   "5ede642e1ccfccbc7b3edaecefb9681a": {
     "question_template": "combien de classes",
     "sql_template": "SELECT COUNT(*) AS nombre_eleves FROM eleve e JOIN inscriptioneleve ie ON e.id = ie.Eleve WHERE ie.Annuler = 0"
+  },
+  "d0be599ead0d6236daf3f3abcf6f93eb": {
+    "question_template": "donne moi les retards effectué par l eleve BenAbda Malak",
+    "sql_template": "SELECT r.id, r.Date, r.Heure, r.Duree, m.NomMatiereFr AS Matiere, \n       CONCAT(p.NomFr, ' ', p.PrenomFr) AS Enseignant, r.Vu\nFROM retard r\nJOIN inscriptioneleve ie ON r.Inscription = ie.id\nJOIN eleve e ON ie.Eleve = e.id\nJOIN personne p_eleve ON e.IdPersonne = p_eleve.id\nJOIN matiere m ON r.Matiere = m.id\nJOIN enseingant ens ON r.Enseignant = ens.id\nJOIN personne p ON ens.idPersonne = p.id\nWHERE CONCAT(p_eleve.NomFr, ' ', p_eleve.PrenomFr) = 'BenAbda Malak';"
+  },
+  "a8f2db8efb48c2a54aae9217102233ec": {
+    "question_template": "donne moi lesnotes de la tirimestre {IDPersonne}  de  l eleve BenAbda Malak",
+    "sql_template": "SELECT em.libematifr AS matiere, ed.moyemati AS moyenne, ex.codeperiexam AS codeTrimestre \nFROM Edumoymaticopie ed\nJOIN Edumatiere em ON ed.codemati = em.codemati\n__PROTECTED_{IDPersonne}__ Eduperiexam ex ON ed.codeperiexam = ex.codeperiexam\nJOIN Eleve e ON e.idedusrv = ed.idenelev\nJOIN personne p ON e.IdPersonne = p.id\nWHERE p.NomFr = 'BenAbda' \nAND p.PrenomFr = 'Malak'\nAND ed.codeperiexam = {IDPersonne}{IDPersonne}\nAND ed.moyemati != '0.00';"
   }
 }

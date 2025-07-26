@@ -1,15 +1,14 @@
-from db_config import get_db_connection
-from llm_utils import ask_llm
+from config.database import get_db_connection
 from langchain_community.utilities import SQLDatabase
 from typing import List, Dict, Optional, Any, Tuple
-from llm_utils import ask_llm 
+from agent.llm_utils import ask_llm 
 from langchain.prompts import PromptTemplate
 import os
 import json
-from template_matcher.matcher import SemanticTemplateMatcher
+from agent.template_matcher.matcher import SemanticTemplateMatcher
 import re
 from pathlib import Path
-from cache_manager import CacheManager
+from agent.cache_manager import CacheManager
 
 PROMPT_TEMPLATE = PromptTemplate(
     input_variables=["input", "table_info", "relevant_domain_descriptions", "relations"],
@@ -92,8 +91,10 @@ Requête SQL :
 )
 
 class SQLAssistant:
-    def __init__(self):
-        self.db = get_db_connection()
+    def __init__(self,db=None   ):
+        self.db = db if db is not None else get_db_connection()
+
+
         self.relations_description = self.load_relations()
         self.domain_descriptions = self.load_domain_descriptions()
         self.domain_to_tables_mapping = self.load_domain_to_tables_mapping()
@@ -116,17 +117,48 @@ class SQLAssistant:
 
     def load_question_templates(self) -> list:
         try:
-            with open('templates_questions.json', 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get('questions', [])
-        except FileNotFoundError:
-            print("⚠️ Fichier templates_questions.json non trouvé. Création d'un fichier vide.")
-            Path('templates_questions.json').touch()
-            return []
+            # Chemin absolu plus fiable
+            templates_path = Path(__file__).parent / 'templates_questions.json'
+            
+            # Vérification approfondie du fichier
+            if not templates_path.exists():
+                print(f"⚠️ Fichier non trouvé, création: {templates_path}")
+                templates_path.write_text('{"questions": []}', encoding='utf-8')
+                return []
+
+            content = templates_path.read_text(encoding='utf-8').strip()
+            if not content:
+                print("⚠️ Fichier vide, réinitialisation")
+                templates_path.write_text('{"questions": []}', encoding='utf-8')
+                return []
+
+            # Validation JSON stricte
+            try:
+                data = json.loads(content)
+                if not isinstance(data.get("questions", []), list):
+                    raise ValueError("Format invalide: 'questions' doit être une liste")
+                
+                # Validation de chaque template
+                valid_templates = []
+                for template in data["questions"]:
+                    if all(key in template for key in ["template_question", "requete_template"]):
+                        valid_templates.append(template)
+                    else:
+                        print(f"⚠️ Template incomplet ignoré: {template.get('description', 'sans description')}")
+                
+                return valid_templates
+
+            except json.JSONDecodeError as e:
+                print(f"❌ Fichier JSON corrompu, réinitialisation. Erreur: {e}")
+                backup_path = templates_path.with_suffix('.bak.json')
+                templates_path.rename(backup_path)
+                templates_path.write_text('{"questions": []}', encoding='utf-8')
+                return []
+
         except Exception as e:
-            print(f"❌ Erreur lors du chargement des templates: {e}")
+            print(f"❌ Erreur critique lors du chargement: {e}")
             return []
- 
+    
     def find_matching_template(self, question: str) -> Optional[Dict[str, Any]]:
         exact_match = self._find_exact_template_match(question)
         if exact_match:
@@ -192,15 +224,15 @@ class SQLAssistant:
         return requete
     
     def load_domain_descriptions(self) -> tuple[Dict[str, str], Dict[str, List[str]]]:
-        with open('prompts/domain_descriptions.json') as f:
+        with open('agent/prompts/domain_descriptions.json') as f:
             return json.load(f)
         
     def load_relations(self) -> str:
-        with open("prompts/relations.txt", "r") as f:
+        with open("agent/prompts/relations.txt", "r") as f:
             return f.read()
         
     def load_domain_to_tables_mapping(self) ->str:
-        with open("prompts/domain_tables_mapping.json", "r") as f:
+        with open("agent/prompts/domain_tables_mapping.json", "r") as f:
             return json.load(f)
 
     def get_relevant_domains(self, query: str, domain_descriptions: Dict[str, str]) -> List[str]:
@@ -273,6 +305,8 @@ class SQLAssistant:
         
         # 3. Génération via LLM
         print("🔍 Aucun template trouvé, utilisation du LLM")
+        if not self.db:
+            raise RuntimeError("Connexion DB non initialisée")
         prompt = PROMPT_TEMPLATE.format(
             input=question,
             table_info=self.db.get_table_info(),

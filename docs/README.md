@@ -17,6 +17,10 @@ assistant_scolaire/
 │   │   └── sql_assistant.py     # Agent SQL avec LLM (ancien agent.py)
 |   ├──agent/
 │   │   ├──assistant.py
+│   │   ├──cache_manager.py
+│   │   ├──llm_utils.py
+│   │   ├──sql_query_cache.json
+│   │   ├──templates_questions.json
 │   │   ├── prompts/
 |   |   |   ├── domain_description.json
 |   |   |   ├── domain_tables_mapping.json
