@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 import logging
 import traceback
+from config.database import init_db, get_db,get_db_connection
+
 
 agent_bp = Blueprint('agent_bp', __name__)
 logger = logging.getLogger(__name__)
@@ -10,7 +12,16 @@ logger = logging.getLogger(__name__)
 assistant = None
 try:
     from agent.assistant import SQLAssistant
-    assistant = SQLAssistant()
+    from config.database import get_db
+
+    assistant = SQLAssistant(db=get_db())
+
+
+    if assistant and assistant.db:
+        print("✅ Connexion DB disponible dans assistant")
+    else:
+        print("❌ Connexion DB manquante dans assistant")
+
     print("✅ Assistant chargé avec succès")
 except Exception as e:
     print(f"❌ Erreur assistant: {e}")
@@ -85,7 +96,7 @@ def ask_sql():  # 🔧 Supprimé @jwt_required temporairement
         
         print(f"🚀 Traitement: '{question}'")
         
-        # Traitement
+        # Traitement    
         try:
             sql_query, response = assistant.ask_question(question)
             print(f"✅ Succès: SQL={sql_query}")
